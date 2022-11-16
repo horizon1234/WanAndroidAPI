@@ -1,0 +1,58 @@
+package com.example.wan
+
+import androidx.appcompat.app.AppCompatActivity
+import android.os.Bundle
+import android.widget.TextView
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlin.concurrent.thread
+
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        findViewById<TextView>(R.id.syncCall).setOnClickListener {
+            sync()
+        }
+        findViewById<TextView>(R.id.asyncCall).setOnClickListener {
+            async()
+        }
+        findViewById<TextView>(R.id.coroutineCall).setOnClickListener {
+            lifecycleScope.launch {
+                val data = KtHttp.create(ApiService::class.java).reposAsync(language = "Kotlin", since = "weekly").await()
+                findViewById<TextView>(R.id.result).text = data.toString()
+            }
+        }
+
+    }
+
+    private fun sync(){
+        thread {
+            val apiService: ApiService = KtHttp.create(ApiService::class.java)
+            val data = apiService.reposSync(language = "Kotlin", since = "weekly")
+            runOnUiThread {
+                findViewById<TextView>(R.id.result).text = data.toString()
+                Toast.makeText(this, "$data", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun async(){
+        KtHttp.create(ApiService::class.java).reposAsync(language = "Java", since = "weekly").call(object : CallBack<RepoList>{
+            override fun onSuccess(data: RepoList) {
+                runOnUiThread {
+                    findViewById<TextView>(R.id.result).text = data.toString()
+                    Toast.makeText(this@MainActivity, "$data", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            override fun onFail(throwable: Throwable) {
+                runOnUiThread {
+                    findViewById<TextView>(R.id.result).text = throwable.toString()
+                    Toast.makeText(this@MainActivity, "$throwable", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+    }
+}
