@@ -1,4 +1,4 @@
-package com.example.wan.annotations
+package com.example.wan.ktHttp.annotations
 
 /**
  * [GET]注解用于标记该方法的调用是HTTP的GET方式

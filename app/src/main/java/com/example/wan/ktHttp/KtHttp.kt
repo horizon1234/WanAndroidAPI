@@ -1,12 +1,13 @@
 package com.example.wan
 
 import android.util.Log
-import com.example.wan.annotations.Field
-import com.example.wan.annotations.GET
+import com.example.wan.ktHttp.annotations.Field
+import com.example.wan.ktHttp.annotations.GET
 import com.google.gson.Gson
 import com.google.gson.internal.`$Gson$Types`.getRawType
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
+import okhttp3.logging.HttpLoggingInterceptor
 import java.io.IOException
 import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
@@ -110,7 +111,12 @@ class KtCall<T: Any>(
  * */
 object KtHttp{
 
-    private val okHttpClient = OkHttpClient()
+    private val okHttpClient = OkHttpClient
+        .Builder()
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        })
+        .build()
     private val gson = Gson()
     val baseUrl = "https://trendings.herokuapp.com"
 
