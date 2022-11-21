@@ -9,8 +9,13 @@ fun main() = runBlocking {
     val job = launch(Dispatchers.Default) {
         var i = 0
         while (true){
-            //这里改成delay
-            delay(500)
+            try {
+                delay(500)
+                //业务代码
+            }catch (e: Exception){
+                //捕获到业务异常，进行处理
+                logX("catch $e")
+            }
             i ++
             println("i = $i")
         }
