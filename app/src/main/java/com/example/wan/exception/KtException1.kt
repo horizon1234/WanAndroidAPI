@@ -1,5 +1,6 @@
 package com.example.wan.exception
 
+import android.util.Log
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors

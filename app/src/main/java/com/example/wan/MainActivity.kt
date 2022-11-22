@@ -6,6 +6,8 @@ import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import com.example.wan.exception.logX
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
@@ -40,6 +42,25 @@ class MainActivity : AppCompatActivity() {
                 }
                 .catch {
                     Log.i("Flow", "catch exception: $it")
+                }
+                .launchIn(lifecycleScope)
+        }
+
+        findViewById<TextView>(R.id.flowReturnCall).setOnClickListener {
+            KtHttp.create(ApiService::class.java).reposFlow(language = "Kotlin", since = "weekly")
+                .flowOn(Dispatchers.IO)
+                .onStart {
+                    Toast.makeText(this@MainActivity, "开始请求", Toast.LENGTH_SHORT).show()
+                }
+                .onCompletion {
+                    Toast.makeText(this@MainActivity, "请求完成", Toast.LENGTH_SHORT).show()
+                }
+                .catch {
+                    Log.i("Flow", "catch exception: $it")
+                }
+                .onEach {
+                    logX("Display UI")
+                    findViewById<TextView>(R.id.result).text = it.toString()
                 }
                 .launchIn(lifecycleScope)
         }

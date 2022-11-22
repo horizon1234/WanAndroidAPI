@@ -1,6 +1,7 @@
 package com.example.wan
 
 import android.util.Log
+import com.example.wan.exception.logX
 import com.example.wan.ktHttp.annotations.Field
 import com.example.wan.ktHttp.annotations.GET
 import com.google.gson.Gson
@@ -11,6 +12,7 @@ import kotlinx.coroutines.channels.onSuccess
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import okhttp3.logging.HttpLoggingInterceptor
@@ -51,6 +53,15 @@ interface ApiService{
         @Field("lang") language: String,
         @Field("since") since: String
     ): RepoList
+
+    /**
+     * [reposFlow]用于异步调用，同时返回类型是[Flow]
+     * */
+    @GET("/repo")
+    fun reposFlow(
+        @Field("lang") language: String,
+        @Field("since") since: String
+    ): Flow<RepoList>
 }
 
 data class RepoList(
@@ -181,17 +192,34 @@ object KtHttp{
             .build()
         val call = okHttpClient.newCall(request)
         //泛型判断
-        return if (isKtCallReturn(method)){
-            val genericReturnType = getTypeArgument(method)
-            KtCall<T>(call, gson, genericReturnType)
-        } else {
-            val response = okHttpClient.newCall(request).execute()
+        return when{
+            isKtCallReturn(method) -> {
+                val genericReturnType = getTypeArgument(method)
+                KtCall<T>(call, gson, genericReturnType)
+            }
+            isFlowReturn(method) -> {
+                logX("Start Out")
+                flow<T> {
+                    logX("Start In")
+                    val genericReturnType = getTypeArgument(method)
+                    val response = okHttpClient.newCall(request).execute()
+                    val json = response.body?.string()
+                    val result = gson.fromJson<T>(json, genericReturnType)
+                    // 传出结果
+                    logX("Start Emit")
+                    emit(result)
+                    logX("End Emit")
+                }
+            }
+            else -> {
+                val response = okHttpClient.newCall(request).execute()
 
-            val genericReturnType = method.genericReturnType
-            val json = response.body?.string()
-            Log.i("zyh", "invoke: json = $json")
-            //这里这个调用，必须要传入泛型参数
-            gson.fromJson<Any?>(json, genericReturnType)
+                val genericReturnType = method.genericReturnType
+                val json = response.body?.string()
+                Log.i("zyh", "invoke: json = $json")
+                //这里这个调用，必须要传入泛型参数
+                gson.fromJson<Any?>(json, genericReturnType)
+            }
         }
     }
 
@@ -201,6 +229,12 @@ object KtHttp{
     */
     private fun isKtCallReturn(method: Method) =
         getRawType(method.genericReturnType) == KtCall::class.java
+
+    /**
+     * 判断方法返回值类型是否是[Flow]类型
+     * */
+    private fun isFlowReturn(method: Method) =
+        getRawType(method.genericReturnType) == Flow::class.java
 
 
     /**

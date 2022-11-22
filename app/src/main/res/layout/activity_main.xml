@@ -40,6 +40,14 @@
         />
 
     <TextView
+        android:id="@+id/flowReturnCall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="返回为flow函数调用"
+        android:padding="10dp"
+        />
+
+    <TextView
         android:id="@+id/result"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
