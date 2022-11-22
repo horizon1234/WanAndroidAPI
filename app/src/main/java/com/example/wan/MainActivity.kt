@@ -2,9 +2,11 @@ package com.example.wan
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
 
@@ -23,6 +25,23 @@ class MainActivity : AppCompatActivity() {
                 val data = KtHttp.create(ApiService::class.java).reposAsync(language = "Kotlin", since = "weekly").await()
                 findViewById<TextView>(R.id.result).text = data.toString()
             }
+        }
+        findViewById<TextView>(R.id.flowCall).setOnClickListener {
+            val dataFlow = KtHttp.create(ApiService::class.java).reposAsync(language = "Kotlin", since = "weekly").asFlow()
+            dataFlow
+                .onStart {
+                    Toast.makeText(this@MainActivity, "开始请求", Toast.LENGTH_SHORT).show()
+                }
+                .onCompletion {
+                    Toast.makeText(this@MainActivity, "请求完成", Toast.LENGTH_SHORT).show()
+                }
+                .onEach {
+                    findViewById<TextView>(R.id.result).text = it.toString()
+                }
+                .catch {
+                    Log.i("Flow", "catch exception: $it")
+                }
+                .launchIn(lifecycleScope)
         }
 
     }

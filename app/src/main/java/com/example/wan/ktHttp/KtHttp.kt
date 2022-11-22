@@ -5,6 +5,12 @@ import com.example.wan.ktHttp.annotations.Field
 import com.example.wan.ktHttp.annotations.GET
 import com.google.gson.Gson
 import com.google.gson.internal.`$Gson$Types`.getRawType
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.onFailure
+import kotlinx.coroutines.channels.onSuccess
+import kotlinx.coroutines.channels.trySendBlocking
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import okhttp3.logging.HttpLoggingInterceptor
@@ -230,5 +236,33 @@ suspend fun <T: Any> KtCall<T>.await() : T =
         }
 }
 
+/**
+ * 把原来[CallBack]形式的代码，改成[Flow]样式的，即消除回调。其实和扩展挂起函数一样，大致有如下步骤：
+ * * 调用一个高阶函数，对于成功数据进行返回，即[trySendBlocking]方法
+ * * 对于失败的数据进行返回异常，即[close]方法
+ * * 同时要可以响应取消，即[awaitClose]方法
+ * */
+fun <T: Any> KtCall<T>.asFlow(): Flow<T> =
+    callbackFlow {
+        //开始网络请求
+        val c = call(object : CallBack<T>{
+            override fun onSuccess(data: T) {
+                //返回正确的数据，但是要调用close()
+                trySendBlocking(data)
+                    .onSuccess { close() }
+                    .onFailure { close(it) }
+            }
+
+            override fun onFail(throwable: Throwable) {
+                //返回异常信息
+                close(throwable)
+            }
+        })
+
+        awaitClose {
+            //响应外部取消请求
+            c.cancel()
+        }
+    }
 
 

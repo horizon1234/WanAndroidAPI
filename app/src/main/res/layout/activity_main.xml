@@ -27,7 +27,15 @@
         android:id="@+id/coroutineCall"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="协程调用"
+        android:text="挂起函数调用"
+        android:padding="10dp"
+        />
+
+    <TextView
+        android:id="@+id/flowCall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="flow函数调用"
         android:padding="10dp"
         />
 
