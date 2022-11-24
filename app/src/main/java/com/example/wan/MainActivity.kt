@@ -65,6 +65,14 @@ class MainActivity : AppCompatActivity() {
                 .launchIn(lifecycleScope)
         }
 
+        findViewById<TextView>(R.id.suspendCall).setOnClickListener {
+            lifecycleScope.launch {
+                val data = KtHttp.create(ApiService::class.java).reposSuspend(language = "Kotlin", since = "weekly")
+                findViewById<TextView>(R.id.result).text = data.toString()
+            }
+
+        }
+
     }
 
     private fun sync(){

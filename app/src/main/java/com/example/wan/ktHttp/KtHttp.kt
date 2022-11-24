@@ -24,6 +24,11 @@ import java.lang.reflect.Type
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.resume
+import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
+import kotlin.reflect.full.functions
+import kotlin.reflect.jvm.javaType
+import kotlin.reflect.jvm.kotlinFunction
 
 /**
  * [ApiService]类定义了整个项目需要调用的接口
@@ -62,6 +67,16 @@ interface ApiService{
         @Field("lang") language: String,
         @Field("since") since: String
     ): Flow<RepoList>
+
+    /**
+     * [reposSuspend]是挂起函数，这里使用直接定义
+     * 和实现挂起函数的方式
+     * */
+    @GET("/repo")
+    suspend fun reposSuspend(
+        @Field("lang") language: String,
+        @Field("since") since: String
+    ): RepoList
 }
 
 data class RepoList(
@@ -193,6 +208,23 @@ object KtHttp{
         val call = okHttpClient.newCall(request)
         //泛型判断
         return when{
+            isSuspend(method) -> {
+                //反射获取类型信息
+                val genericReturnType = method.kotlinFunction?.returnType?.javaType ?: throw java.lang.IllegalStateException()
+                //okHttp的Call
+                val call = okHttpClient!!.newCall(request)
+                //调用realCall方法
+                val continuation = args.last() as? Continuation<T>
+                //将挂起函数类型转换成，带Continuation的类型
+//                val func = ::realCall as (Call,Gson,Type,Continuation<T>?) -> Any?
+//                func.invoke(call, gson,genericReturnType,continuation)
+
+//                val func = ::temp as (Call,Gson,Type,Continuation<T>?) -> Any?
+//                func.invoke(call, gson,genericReturnType,continuation)
+
+                val func = KtHttp::class.getGenericFunction("realCall")
+                func?.call(call, gson,genericReturnType,continuation)
+            }
             isKtCallReturn(method) -> {
                 val genericReturnType = getTypeArgument(method)
                 KtCall<T>(call, gson, genericReturnType)
@@ -223,6 +255,45 @@ object KtHttp{
         }
     }
 
+    suspend fun temp(call: Call, gson: Gson, type: Type) = realCall<RepoList>(call, gson, type)
+
+    /**
+     * 获取方法的反射对象
+     * */
+    fun KClass<*>.getGenericFunction(name: String): KFunction<*>{
+        return members.single { it.name == name } as KFunction<*>
+    }
+
+    /**
+     * 该方法是[suspend]方法，用于实现挂起函数，其实在内部也调用了一个挂起函数，
+     * 这里的重点是[Continuation]参数，利用该参数，返回挂起函数恢复的值。
+     *
+     * @param call [OkHttp]的[call]对象，用于网络请求。
+     * @param gson [Gson]的对象，用于反序列化实例
+     * @param type [Type]的对象，它是区别与[Class]，是真正表示一个类的类型
+     * */
+    suspend fun <T: Any> realCall(call: Call,gson: Gson,type: Type): T =
+        suspendCancellableCoroutine { continuation ->
+            call.enqueue(object : Callback{
+                override fun onFailure(call: Call, e: IOException) {
+                    continuation.resumeWithException(e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        val t = gson.fromJson<T>(response.body?.string(), type)
+                        continuation.resume(t)
+                    } catch (e: java.lang.Exception){
+                        continuation.resumeWithException(e)
+                    }
+                }
+            })
+
+            continuation.invokeOnCancellation {
+                call.cancel()
+            }
+    }
+
     /**
      * 判断方法返回类型是否是[KtCall]类型。这里调用了[Gson]中的方法，具体可以研究一下，
      * 对于类型来说，RawType和Type有什么区别
@@ -236,6 +307,8 @@ object KtHttp{
     private fun isFlowReturn(method: Method) =
         getRawType(method.genericReturnType) == Flow::class.java
 
+    private fun isSuspend(method: Method) =
+        method.kotlinFunction?.isSuspend ?: false
 
     /**
      * 获取[Method]的返回值类型中的泛型参数
