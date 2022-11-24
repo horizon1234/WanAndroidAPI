@@ -33,7 +33,7 @@ import kotlin.reflect.jvm.kotlinFunction
 /**
  * [ApiService]类定义了整个项目需要调用的接口
  * */
-interface ApiService{
+interface ApiService {
 
     /**
      * [reposAsync]用于异步获取仓库信息
@@ -99,9 +99,9 @@ data class Repo(
 /**
  * 业务使用的接口，表示返回的数据
  * */
-interface CallBack<T: Any>{
+interface CallBack<T : Any> {
     fun onSuccess(data: T)
-    fun onFail(throwable:Throwable)
+    fun onFail(throwable: Throwable)
 }
 
 /**
@@ -112,23 +112,23 @@ interface CallBack<T: Any>{
  * @param gson [Gson]的实例，用来反序列化
  * @param type [Type]类型实例，用来反序列化
  * */
-class KtCall<T: Any>(
+class KtCall<T : Any>(
     private val call: Call,
     private val gson: Gson,
     private val type: Type
-){
+) {
 
-    fun call(callback: CallBack<T>): Call{
-        call.enqueue(object : okhttp3.Callback{
+    fun call(callback: CallBack<T>): Call {
+        call.enqueue(object : okhttp3.Callback {
             override fun onFailure(call: Call, e: IOException) {
                 callback.onFail(e)
             }
 
             override fun onResponse(call: Call, response: Response) {
                 try {
-                    val data = gson.fromJson<T>(response.body?.string(),type)
+                    val data = gson.fromJson<T>(response.body?.string(), type)
                     callback.onSuccess(data)
-                }catch (e: java.lang.Exception){
+                } catch (e: java.lang.Exception) {
                     callback.onFail(e)
                 }
             }
@@ -141,7 +141,7 @@ class KtCall<T: Any>(
  * 单例类
  *
  * */
-object KtHttp{
+object KtHttp {
 
     private val okHttpClient = OkHttpClient
         .Builder()
@@ -159,14 +159,14 @@ object KtHttp{
      * 代理到该lambda中执行。[method]就是对象中的方法，[args]是该
      * 方法的参数。
      * */
-    fun <T: Any> create(service: Class<T>): T {
+    fun <T : Any> create(service: Class<T>): T {
         return Proxy.newProxyInstance(
             service.classLoader,
             arrayOf(service)
-        ){ _,method,args ->
+        ) { _, method, args ->
             val annotations = method.annotations
-            for (annotation in annotations){
-                if (annotation is GET){
+            for (annotation in annotations) {
+                if (annotation is GET) {
                     val url = baseUrl + annotation.value
                     return@newProxyInstance invoke<T>(url, method, args!!)
                 }
@@ -183,19 +183,19 @@ object KtHttp{
      * 类型，则直接进行同步调用。
      * @param args 方法的参数。
      * */
-    private fun <T: Any> invoke(path: String, method: Method, args: Array<Any>): Any?{
+    private fun <T : Any> invoke(path: String, method: Method, args: Array<Any>): Any? {
         if (method.parameterAnnotations.size != args.size) return null
 
         var url = path
         val paramAnnotations = method.parameterAnnotations
-        for (i in paramAnnotations.indices){
-            for (paramAnnotation in paramAnnotations[i]){
-                if (paramAnnotation is Field){
+        for (i in paramAnnotations.indices) {
+            for (paramAnnotation in paramAnnotations[i]) {
+                if (paramAnnotation is Field) {
                     val key = paramAnnotation.value
                     val value = args[i].toString()
-                    if (!url.contains("?")){
+                    if (!url.contains("?")) {
                         url += "?$key=$value"
-                    }else{
+                    } else {
                         url += "&$key=$value"
                     }
                 }
@@ -207,14 +207,16 @@ object KtHttp{
             .build()
         val call = okHttpClient.newCall(request)
         //泛型判断
-        return when{
+        return when {
             isSuspend(method) -> {
                 //反射获取类型信息
-                val genericReturnType = method.kotlinFunction?.returnType?.javaType ?: throw java.lang.IllegalStateException()
+                val genericReturnType = method.kotlinFunction?.returnType?.javaType
+                    ?: throw java.lang.IllegalStateException()
                 //okHttp的Call
                 val call = okHttpClient!!.newCall(request)
                 //调用realCall方法
                 val continuation = args.last() as? Continuation<T>
+                Log.i(KtHttp.javaClass.simpleName, "invoke: continuation : $continuation")
                 //将挂起函数类型转换成，带Continuation的类型
 //                val func = ::realCall as (Call,Gson,Type,Continuation<T>?) -> Any?
 //                func.invoke(call, gson,genericReturnType,continuation)
@@ -223,7 +225,7 @@ object KtHttp{
 //                func.invoke(call, gson,genericReturnType,continuation)
 
                 val func = KtHttp::class.getGenericFunction("realCall")
-                func?.call(call, gson,genericReturnType,continuation)
+                func.call(this, call, gson, genericReturnType, continuation)
             }
             isKtCallReturn(method) -> {
                 val genericReturnType = getTypeArgument(method)
@@ -260,7 +262,7 @@ object KtHttp{
     /**
      * 获取方法的反射对象
      * */
-    fun KClass<*>.getGenericFunction(name: String): KFunction<*>{
+    fun KClass<*>.getGenericFunction(name: String): KFunction<*> {
         return members.single { it.name == name } as KFunction<*>
     }
 
@@ -272,9 +274,9 @@ object KtHttp{
      * @param gson [Gson]的对象，用于反序列化实例
      * @param type [Type]的对象，它是区别与[Class]，是真正表示一个类的类型
      * */
-    suspend fun <T: Any> realCall(call: Call,gson: Gson,type: Type): T =
+    suspend fun <T : Any> realCall(call: Call, gson: Gson, type: Type): T =
         suspendCancellableCoroutine { continuation ->
-            call.enqueue(object : Callback{
+            call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     continuation.resumeWithException(e)
                 }
@@ -283,7 +285,7 @@ object KtHttp{
                     try {
                         val t = gson.fromJson<T>(response.body?.string(), type)
                         continuation.resume(t)
-                    } catch (e: java.lang.Exception){
+                    } catch (e: java.lang.Exception) {
                         continuation.resumeWithException(e)
                     }
                 }
@@ -292,12 +294,12 @@ object KtHttp{
             continuation.invokeOnCancellation {
                 call.cancel()
             }
-    }
+        }
 
     /**
      * 判断方法返回类型是否是[KtCall]类型。这里调用了[Gson]中的方法，具体可以研究一下，
      * 对于类型来说，RawType和Type有什么区别
-    */
+     */
     private fun isKtCallReturn(method: Method) =
         getRawType(method.genericReturnType) == KtCall::class.java
 
@@ -307,6 +309,9 @@ object KtHttp{
     private fun isFlowReturn(method: Method) =
         getRawType(method.genericReturnType) == Flow::class.java
 
+    /**
+     * 判断方法是否是[suspend]方法
+     * */
     private fun isSuspend(method: Method) =
         method.kotlinFunction?.isSuspend ?: false
 
@@ -324,10 +329,10 @@ object KtHttp{
  * 这里的[suspendCancellableCoroutine] 翻译过来就是挂起可取消的协程，因为我们需要结果，所以
  * 需要在合适的时机恢复，而恢复就是通过[Continuation]的[resumeWith]方法来完成。
  * */
-suspend fun <T: Any> KtCall<T>.await() : T =
+suspend fun <T : Any> KtCall<T>.await(): T =
     suspendCancellableCoroutine { continuation ->
         //开始网络请求
-        val c = call(object : CallBack<T>{
+        val c = call(object : CallBack<T> {
             override fun onSuccess(data: T) {
                 //这里扩展函数也是奇葩，容易重名
                 continuation.resume(data)
@@ -341,7 +346,7 @@ suspend fun <T: Any> KtCall<T>.await() : T =
         continuation.invokeOnCancellation {
             c.cancel()
         }
-}
+    }
 
 /**
  * 把原来[CallBack]形式的代码，改成[Flow]样式的，即消除回调。其实和扩展挂起函数一样，大致有如下步骤：
@@ -349,10 +354,10 @@ suspend fun <T: Any> KtCall<T>.await() : T =
  * * 对于失败的数据进行返回异常，即[close]方法
  * * 同时要可以响应取消，即[awaitClose]方法
  * */
-fun <T: Any> KtCall<T>.asFlow(): Flow<T> =
+fun <T : Any> KtCall<T>.asFlow(): Flow<T> =
     callbackFlow {
         //开始网络请求
-        val c = call(object : CallBack<T>{
+        val c = call(object : CallBack<T> {
             override fun onSuccess(data: T) {
                 //返回正确的数据，但是要调用close()
                 trySendBlocking(data)
