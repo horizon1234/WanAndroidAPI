@@ -5,29 +5,23 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
-
-// 代码段1
-
 fun main()  {
     val scope = CoroutineScope(Job())
-    // 1，创建管道
+    //创建管道，都使用默认参数
     val channel = Channel<Int>()
-
     scope.launch {
-        // 2，在一个单独的协程当中发送管道消息
+        //在一个单独的协程当中发送管道消息
         repeat(3)  {
             channel.send(it)
             println("Send: $it")
         }
-
         channel.close()
     }
-
     scope.launch {
-        // 3，在一个单独的协程当中接收管道消息
+        //在一个单独的协程当中接收管道消息
         repeat(3) {
             val result = channel.receive()
-            println("Receive ${result}")
+            println("Receive $result")
         }
     }
 
